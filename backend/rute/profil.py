@@ -54,12 +54,36 @@ def obtine_statistici_utilizator(
         if calculeaza_status_litera(p.incercari, p.reusit) == STATUS_STAPANIT
     )
 
-    # Zile cu activitate (cate zile distincte au aparut cuvinte)
+    #Zile cu activitate (cate zile distincte au aparut cuvinte)
     zileCuActivitate = sesiune_db.query(
         func.date(CuvantTradus.data_adaugare)
     ).filter(
         CuvantTradus.id_utilizator == utilizator_curent.id
     ).distinct().count()
+    
+    #Luam zilele distincte în care utilizatorul a avut activitate
+    randuriZileActive = sesiune_db.query(
+        func.date(CuvantTradus.data_adaugare)
+    ).filter(
+        CuvantTradus.id_utilizator == utilizator_curent.id
+    ).distinct().all()
+
+    #Transformam zilele intr-un set, ca sa putem verifica rapid zilele consecutive
+    zileActive = {
+        datetime.strptime(str(rand[0]), "%Y-%m-%d").date()
+        for rand in randuriZileActive
+        if rand[0] is not None
+    }
+
+    #Calculam streak-ul pornind de la ziua de azi si mergand inapoi
+    ziCurenta = datetime.utcnow().date()
+    streakCurent = 0
+
+    while ziCurenta in zileActive:
+        streakCurent += 1
+        ziCurenta = ziCurenta - timedelta(days=1)
+        
+    
 
     return {
         "totalCuvinteTradusse": totalCuvinteTradusse,
@@ -68,7 +92,7 @@ def obtine_statistici_utilizator(
         "acurateteaMedieGlobala": round(acurateateaMedie * 100),
         "minutePractica": zileCuActivitate * 4,
         "zileCuActivitate": zileCuActivitate,
-        "streakCurent": utilizator_curent.streak_curent,
+        "streakCurent": streakCurent 
     }
 
 
@@ -92,7 +116,7 @@ def obtine_progres_invatare(
 
     return {
         "progres": progresDict,
-        "streak": utilizator_curent.streak_curent,  # linie nouă
+        "streak": utilizator_curent.streak_curent,  #linie noua 
     }
 
 
@@ -126,12 +150,12 @@ def actualizeaza_progres_litera(
         sesiune_db.add(randNou)
 
     sesiune_db.commit()
-    # Daca nu a mai practicat azi, actualizeaza streak-ul
+    #Daca nu a mai practicat azi, actualizeaza streak-ul
     azi = datetime.utcnow().date()
     ultima = utilizator_curent.data_ultima_activitate
     if ultima is None or ultima.date() < azi:
         if ultima is not None and (azi - ultima.date()).days > 1:
-            utilizator_curent.streak_curent = 1  # resetare
+            utilizator_curent.streak_curent = 1  #resetare
         else:
             utilizator_curent.streak_curent += 1
         utilizator_curent.data_ultima_activitate = datetime.utcnow()
@@ -146,7 +170,7 @@ def obtine_activitate_calendar(
 ):
     dataLimita = datetime.utcnow() - timedelta(days=91)
 
-    # Luam datele in UTC din baza de date
+    #Luam datele in UTC din baza de date
     cuvinteDinPerioadaSelectata = sesiune_db.query(
         func.date(CuvantTradus.data_adaugare).label("data"),
         func.count(CuvantTradus.id).label("numar"),
@@ -187,7 +211,7 @@ def obtine_confuzii_litere(
         ProgresInvatare.incercari > 0,
     ).all()
 
-    # Litere cu rata de esec ridicata (incercari - reusit / incercari)
+    #Litere cu rata de esec ridicata (incercari - reusit/incercari)
     rezultate = []
     for r in randuri:
         if r.incercari >= 2:
